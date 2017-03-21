@@ -4,8 +4,8 @@ After=syslog.target network.target
 
 [Service]
 Type=simple
-User=nova
-ExecStart=/usr/local/bin/openstack-dns-updater.py
+User=root
+ExecStart=/opt/openstack-dns-updater/openstack-dns-updater.py
 PrivateTmp=true
 KillMode=process
 

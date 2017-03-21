@@ -19,3 +19,10 @@ run `service openstack-dns-updater start`.
 
 For more information refer to:
 http://alesnosek.com/blog/2015/05/31/openstack-dynamic-dns-updates/
+
+## SEEBURGER Fork
+
+This fork is extended with the option to track floating IPs and assign
+a machine to an internal and external name (both relative to a single domain).
+
+https://github.com/seeburger-ag/openstack-dns-updater
