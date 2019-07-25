@@ -16,57 +16,53 @@
 import json
 import logging as log
 import pprint
+import powerdns
+
 from subprocess import Popen, PIPE
-from kombu import BrokerConnection
-from kombu import Exchange
-from kombu import Queue
+from kombu import BrokerConnection, Exchange, Queue
 from kombu.mixins import ConsumerMixin
 from keystoneclient.auth.identity import v3
 from keystoneclient import session
 from novaclient.v2 import client
 
-LOG_FILE="/var/log/nova/dns-updater.log"
+import sys
+import os
+import pprint 
+pp = pprint.PrettyPrinter(indent=4)
 
-EXCHANGE_NAME_NOVA="nova"
-EXCHANGE_NAME_NEUTRON="neutron"
-ROUTING_KEY="notifications.info"
-QUEUE_NAME="dns_updater_queue"
-BROKER_URI="amqp://guest:guest@control-rmq:5672//"
+LOG_FILE=os.getenv('LOG_FILE','UNDEfINED')
+LOG_FILE=os.getenv('LOG_FILE','UNDEfINED')
+EXCHANGE_NAME_NOVA=os.getenv('EXCHANGE_NAME_NOVA','UNDEfINED')
+EXCHANGE_NAME_NEUTRON=os.getenv('EXCHANGE_NAME_NEUTRON','UNDEfINED')
+ROUTING_KEY=os.getenv('ROUTING_KEY','UNDEfINED')
+#ROUTING_KEY=os.getenv('#ROUTING_KEY','UNDEfINED')
+QUEUE_NAME=os.getenv('QUEUE_NAME','UNDEfINED')
+BROKER_URI=os.getenv('BROKER_URI','UNDEfINED')
+OS_AUTH_URL=os.getenv('OS_AUTH_URL','UNDEfINED')
+OS_USERNAME=os.getenv('OS_USERNAME','UNDEfINED')
+OS_PASSWORD=os.getenv('OS_PASSWORD','UNDEfINED')
+OS_TENANT_NAME=os.getenv('OS_TENANT_NAME','UNDEfINED')
+OS_USER_DOMAIN_NAME=os.getenv('OS_USER_DOMAIN_NAME','UNDEfINED')
+OS_PROJECT_DOMAIN_NAME=os.getenv('OS_PROJECT_DOMAIN_NAME','UNDEfINED')
+OS_USERNAME=os.getenv('OS_USERNAME','UNDEfINED')
+OS_IDENTITY_API_VERSION=os.getenv('OS_IDENTITY_API_VERSION','UNDEfINED')
+OS_PASSWORD=os.getenv('OS_PASSWORD','UNDEfINED')
+OS_PROJECT_NAME=os.getenv('OS_PROJECT_NAME','UNDEfINED')
+OS_USER_DOMAIN_NAME=os.getenv('OS_USER_DOMAIN_NAME','UNDEfINED')
+OS_PROJECT_DOMAIN_ID=os.getenv('OS_PROJECT_DOMAIN_ID','UNDEfINED')
+S_REGION_NAME=os.getenv('S_REGION_NAME','UNDEfINED')
+OS_INTERFACE=os.getenv('OS_INTERFACE','UNDEfINED')
+OS_IDENTITY_API_VERSION=os.getenv('OS_IDENTITY_API_VERSION','UNDEfINED')
+EVENT_CREATE=os.getenv('EVENT_CREATE','UNDEfINED')
+EVENT_DELETE=os.getenv('EVENT_DELETE','UNDEfINED')
+EVENT_IP_UPDATE=os.getenv('EVENT_IP_UPDATE','UNDEfINED')
+INTERNAL_DOMAIN=os.getenv('INTERNAL_DOMAIN','UNDEfINED')
+EXTERNAL_DOMAIN=os.getenv('EXTERNAL_DOMAIN','UNDEfINED')
+PDNS_API=os.getenv('PDNS_API','UNDEfINED')
+PDNS_KEY=os.getenv('PDNS_KEY','UNDEfINED')
+TTL=os.getenv('TTL','UNDEfINED')
+NAMESERVER=os.getenv('NAMESERVER','UNDEfINED')
 
-OS_AUTH_URL="http://control-public:5000/v3"
-OS_USERNAME="guest"
-OS_PASSWORD="guest"
-OS_TENANT_NAME="demo"
-OS_USER_DOMAIN_NAME="Default"
-OS_PROJECT_DOMAIN_NAME="Default"
-
-EVENT_CREATE="compute.instance.create.end"
-EVENT_DELETE="compute.instance.delete.start"
-EVENT_IP_UPDATE="floatingip.update.end"
-
-INTERNAL_DOMAIN="nova"
-EXTERNAL_DOMAIN="example.com"
-
-NAMESERVER="localhost"
-TTL=1
-NSUPDATE_ADD_INTERNAL="\
-server {nameserver}\n\
-update delete {hostname}.{project}.{internal_domain}. A\n\
-update delete {hostname}.{project}.{external_domain}. A\n\
-update add {hostname}.{project}.{internal_domain}. {ttl} A {hostaddr}\n\
-send"
-
-NSUPDATE_ADD_PUBLIC="\
-server {nameserver}\n\
-update add {hostname}.{project}.{external_domain}. {ttl} A {hostaddr}\n\
-update add {hostname}.{project}.{internal_domain}. {ttl} A {hostaddr_internal}\n\
-send"
-
-NSUPDATE_DEL_INTERNAL="\
-server {nameserver}\n\
-update delete {hostname}.{project}.{internal_domain}. A\n\
-update delete {hostname}.{project}.{external_domain}. A\n\
-send"
 
 log.basicConfig(filename=LOG_FILE, level=log.INFO, format='%(asctime)s %(message)s')
 
@@ -81,6 +77,7 @@ class DnsUpdater(ConsumerMixin):
                            user_domain_name=OS_USER_DOMAIN_NAME,
                            project_domain_name=OS_PROJECT_DOMAIN_NAME)
         s = session.Session(auth=auth)
+        log.info("Session {}".format(s))
         self.nova = client.Client(session=s)
         return
 
@@ -101,47 +98,80 @@ class DnsUpdater(ConsumerMixin):
         exchange_neutron = Exchange(EXCHANGE_NAME_NEUTRON, type="topic", durable=False)
         queue_nova = Queue(QUEUE_NAME, exchange_nova, routing_key = ROUTING_KEY, durable=False, auto_delete=True, no_ack=True)
         queue_neutron = Queue(QUEUE_NAME, exchange_neutron, routing_key = ROUTING_KEY, durable=False, auto_delete=True, no_ack=True)
-        return [ consumer([queue_nova, queue_neutron], callbacks = [ self.on_message ]) ]
+        return [ consumer( queues = [queue_neutron], callbacks = [ self.on_message ]) ,  consumer(queue_nova, callbacks = [ self.on_message ])]
 
     def on_message(self, body, message):
         try:
             self._handle_message(body)
-        except Exception, e:
+        except Exception as e:
             log.info(repr(e))
 
     def _handle_message(self, body):
-        log.debug('Body: %r' % body)
+
         jbody = json.loads(body["oslo.message"])
         event_type = jbody["event_type"]
-        log.debug("Event type: {}".format(event_type))
+        log.info("Event type: {}".format(event_type))
         project = jbody["_context_project_name"]
         project_id = jbody["_context_project_id"]
         hostaddr_internal = ""
+
         if event_type in [ EVENT_CREATE, EVENT_DELETE, EVENT_IP_UPDATE ]:
+
+            log.info("Have changes for project {}".format(project))
+
+            api_client = powerdns.PDNSApiClient(api_endpoint=PDNS_API, api_key=PDNS_KEY)
+            api = powerdns.PDNSEndpoint(api_client)
+
+            internal_zone = api.servers[0].get_zone('{}.internal.dev.seeburger.de.'.format(project))
+            external_zone = api.servers[0].get_zone('{}.dev.seeburger.de.'.format(project))
+
             if event_type == EVENT_CREATE:
+                server_id = jbody["payload"]["instance_id"]
                 hostname = jbody["payload"]["hostname"]
                 hostaddr = jbody["payload"]["fixed_ips"][0]["address"]
-                nsupdate_script = NSUPDATE_ADD_INTERNAL
-                log.info("Adding {}.{}.internal.seeburger.de {}".format(hostname, project, hostaddr))
+                log.info("Adding {}.{}.internal.seeburger.de. \tA \t{} \t{}".format(hostname, project, TTL, hostaddr))
+
                 user = jbody["_context_user_name"]
                 user_id = jbody["_context_user_id"]
-                server_id = jbody["payload"]["instance_id"]
+                # server_id = jbody["payload"]["instance_id"]
                 log.debug("Instance ID: {}, User: {}, User ID: {}, Project: {}, Project ID: {}".format(server_id, user, user_id, project, project_id))
+
                 server = self.nova.servers.get(server_id)
-                self.nova.servers.set_meta_item(server, "project", project)
-                self.nova.servers.set_meta_item(server, "project_id", project_id)
-                self.nova.servers.set_meta_item(server, "user", user)
-                self.nova.servers.set_meta_item(server, "user_id", user_id)
-                self.nova.servers.set_meta_item(server, "ip", hostaddr)
-                self.nova.servers.set_meta_item(server, "hostname", hostname)
+
+                try:
+                    self.nova.servers.set_meta_item(server, "project", project)
+                    self.nova.servers.set_meta_item(server, "project_id", project_id)
+                    self.nova.servers.set_meta_item(server, "user", user)
+                    self.nova.servers.set_meta_item(server, "user_id", user_id)
+                    self.nova.servers.set_meta_item(server, "ip", hostaddr)
+                    self.nova.servers.set_meta_item(server, "hostname", hostname)
+                except Exception as e:
+                    log.warn("Exception {} thrown".format(e))
+
+                # Delete old A records, which may have existed and create a new one in the
+                # Zone of the internal and externat domain
+                internal_zone.delete_record([powerdns.RRSet(hostname,'A',[])])
+                external_zone.delete_record([powerdns.RRSet(hostname,'A',[])])
+                internal_zone.create_records([
+                    powerdns.RRSet(hostname,'A',[(hostaddr,False)], TTL)
+                    ])
+
             elif event_type == EVENT_DELETE:
+
+                server_id = jbody["payload"]["instance_id"]
                 hostname = jbody["payload"]["hostname"]
                 hostaddr = ""
-                nsupdate_script = NSUPDATE_DEL_INTERNAL
                 log.info("Deleting {}.{}[.internal].seeburger.de".format(hostname, project))
+
+                # As the instance vanished, delete all remaining know A records.
+                internal_zone.delete_record([powerdns.RRSet(hostname,'A',[])])
+                external_zone.delete_record([powerdns.RRSet(hostname,'A',[])])
+
             elif event_type == EVENT_IP_UPDATE:
                 hostaddr = jbody["payload"]["floatingip"]["floating_ip_address"]
                 ip = jbody["payload"]["floatingip"]["fixed_ip_address"]
+                log.info("Hostaddr {}".format(hostaddr))
+                log.info("Ip {}".format(ip))
                 if ip == None:
                     log.info("Disaccotiated floating ip {}. Do nothing for now...".format(hostaddr))
                     return
@@ -150,20 +180,26 @@ class DnsUpdater(ConsumerMixin):
                     server = self.get_server_for_ip(ip, project_id)
                     hostaddr_internal = ip
                     hostname = server.name
-                    nsupdate_script = NSUPDATE_ADD_PUBLIC
-                log.info("Adding {}.{}.dev.seeburger.de {}".format(hostname, project, hostaddr))
+                    #nsupdate_script = NSUPDATE_ADD_PUBLIC
+                    log.info("Adding records for hostname {}".format(hostname))
+                    
+                    # Add or update A records fir internal and external domain.
+                    log.info("Adding address...")
+                    external_zone.create_records([
+                        powerdns.RRSet(hostname, 'A', [(hostaddr, False)], TTL)
+                        ])
+                    internal_zone.create_records([
+                        powerdns.RRSet(hostname, 'A', [(hostaddr_internal, False)], TTL)
+                        ])
+
+                log.info("Added {}.{}.dev.seeburger.de {}".format(hostname, project, hostaddr))
             else:
                 log.error("Unknown event type: {} - Do nothing".format(event_type))
                 return
-            p = Popen(['nsupdate'], stdin=PIPE)
-            input = nsupdate_script.format(nameserver=NAMESERVER, hostname=hostname, ttl=TTL,
-                                           internal_domain=INTERNAL_DOMAIN, external_domain=EXTERNAL_DOMAIN,
-                                           hostaddr=hostaddr, hostaddr_internal=hostaddr_internal, project=project)
-            log.debug("Executing nsupdate {}".format(input))
-            p.communicate(input=input)
-
 
 if __name__ == "__main__":
     log.info("Connecting to broker {}".format(BROKER_URI))
     with BrokerConnection(BROKER_URI) as connection:
         DnsUpdater(connection).run()
+
+# vim: expandtab sw=4 ts=4

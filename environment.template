@@ -1,0 +1,38 @@
+export LOG_FILE="/var/log/nova/dns-updater.log"
+
+export EXCHANGE_NAME_NOVA="nova"
+export EXCHANGE_NAME_NEUTRON="neutron"
+export ROUTING_KEY="notifications.info"
+export QUEUE_NAME="dns_updater_queue"
+export BROKER_URI="amqp://USERNAME:PASSWORD@hase.example.com:5672//"
+
+export OS_AUTH_URL="https://api.example.com:5000/v3"
+export OS_USERNAME="USERNAME"
+export OS_PASSWORD="PASSWORD"
+export OS_TENANT_NAME="infra"
+export OS_USER_DOMAIN_NAME="Default"
+export OS_PROJECT_DOMAIN_NAME="Default"
+
+export OS_USERNAME="USERBAME"
+export OS_IDENTITY_API_VERSION=3
+export OS_PASSWORD="PASSWORD"
+export OS_PROJECT_NAME="PRIJECTNAME"
+export OS_USER_DOMAIN_NAME="Default"
+export OS_PROJECT_DOMAIN_ID="default"
+export S_REGION_NAME="RegionOne"
+export OS_INTERFACE="public"
+export OS_IDENTITY_API_VERSION=3
+
+export EVENT_CREATE="compute.instance.create.end"
+export EVENT_DELETE="compute.instance.delete.start"
+export EVENT_IP_UPDATE="floatingip.update.end"
+
+export INTERNAL_DOMAIN="internal.dev.seeburger.de"
+export EXTERNAL_DOMAIN="dev.seeburger.de"
+
+export PDNS_API="http://dns.example.com:8150/api/v1"
+export PDNS_KEY="APIKEY"
+export TTL=60
+
+export NAMESERVER="dns.example.com"
+
