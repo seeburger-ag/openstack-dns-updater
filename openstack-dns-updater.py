@@ -16,55 +16,54 @@
 import json
 import logging as log
 import pprint
-import powerdns
+import sys
+import os
 
 from subprocess import Popen, PIPE
 from kombu import BrokerConnection, Exchange, Queue
 from kombu.mixins import ConsumerMixin
 from keystoneclient.auth.identity import v3
 from keystoneclient import session
-from novaclient.v2 import client
+from novaclient import client
 
-import sys
-import os
-import pprint 
+import powerdns
+
 pp = pprint.PrettyPrinter(indent=4)
 
-LOG_FILE=os.getenv('LOG_FILE','UNDEfINED')
-LOG_FILE=os.getenv('LOG_FILE','UNDEfINED')
-EXCHANGE_NAME_NOVA=os.getenv('EXCHANGE_NAME_NOVA','UNDEfINED')
-EXCHANGE_NAME_NEUTRON=os.getenv('EXCHANGE_NAME_NEUTRON','UNDEfINED')
-ROUTING_KEY=os.getenv('ROUTING_KEY','UNDEfINED')
-#ROUTING_KEY=os.getenv('#ROUTING_KEY','UNDEfINED')
-QUEUE_NAME=os.getenv('QUEUE_NAME','UNDEfINED')
-BROKER_URI=os.getenv('BROKER_URI','UNDEfINED')
-OS_AUTH_URL=os.getenv('OS_AUTH_URL','UNDEfINED')
-OS_USERNAME=os.getenv('OS_USERNAME','UNDEfINED')
-OS_PASSWORD=os.getenv('OS_PASSWORD','UNDEfINED')
-OS_TENANT_NAME=os.getenv('OS_TENANT_NAME','UNDEfINED')
-OS_USER_DOMAIN_NAME=os.getenv('OS_USER_DOMAIN_NAME','UNDEfINED')
-OS_PROJECT_DOMAIN_NAME=os.getenv('OS_PROJECT_DOMAIN_NAME','UNDEfINED')
-OS_USERNAME=os.getenv('OS_USERNAME','UNDEfINED')
-OS_IDENTITY_API_VERSION=os.getenv('OS_IDENTITY_API_VERSION','UNDEfINED')
-OS_PASSWORD=os.getenv('OS_PASSWORD','UNDEfINED')
-OS_PROJECT_NAME=os.getenv('OS_PROJECT_NAME','UNDEfINED')
-OS_USER_DOMAIN_NAME=os.getenv('OS_USER_DOMAIN_NAME','UNDEfINED')
-OS_PROJECT_DOMAIN_ID=os.getenv('OS_PROJECT_DOMAIN_ID','UNDEfINED')
-S_REGION_NAME=os.getenv('S_REGION_NAME','UNDEfINED')
-OS_INTERFACE=os.getenv('OS_INTERFACE','UNDEfINED')
-OS_IDENTITY_API_VERSION=os.getenv('OS_IDENTITY_API_VERSION','UNDEfINED')
-EVENT_CREATE=os.getenv('EVENT_CREATE','UNDEfINED')
-EVENT_DELETE=os.getenv('EVENT_DELETE','UNDEfINED')
-EVENT_IP_UPDATE=os.getenv('EVENT_IP_UPDATE','UNDEfINED')
-INTERNAL_DOMAIN=os.getenv('INTERNAL_DOMAIN','UNDEfINED')
-EXTERNAL_DOMAIN=os.getenv('EXTERNAL_DOMAIN','UNDEfINED')
-PDNS_API=os.getenv('PDNS_API','UNDEfINED')
-PDNS_KEY=os.getenv('PDNS_KEY','UNDEfINED')
-TTL=os.getenv('TTL','UNDEfINED')
-NAMESERVER=os.getenv('NAMESERVER','UNDEfINED')
+LOG_FILE=os.getenv('LOG_FILE','UNDEFINED')
+LOG_FILE=os.getenv('LOG_FILE','UNDEFINED')
+EXCHANGE_NAME_NOVA=os.getenv('EXCHANGE_NAME_NOVA','UNDEFINED')
+EXCHANGE_NAME_NEUTRON=os.getenv('EXCHANGE_NAME_NEUTRON','UNDEFINED')
+ROUTING_KEY=os.getenv('ROUTING_KEY','UNDEFINED')
+QUEUE_NAME=os.getenv('QUEUE_NAME','UNDEFINED')
+BROKER_URI=os.getenv('BROKER_URI','UNDEFINED')
+OS_AUTH_URL=os.getenv('OS_AUTH_URL','UNDEFINED')
+OS_USERNAME=os.getenv('OS_USERNAME','UNDEFINED')
+OS_PASSWORD=os.getenv('OS_PASSWORD','UNDEFINED')
+OS_TENANT_NAME=os.getenv('OS_TENANT_NAME','UNDEFINED')
+OS_USER_DOMAIN_NAME=os.getenv('OS_USER_DOMAIN_NAME','UNDEFINED')
+OS_PROJECT_DOMAIN_NAME=os.getenv('OS_PROJECT_DOMAIN_NAME','UNDEFINED')
+OS_USERNAME=os.getenv('OS_USERNAME','UNDEFINED')
+OS_IDENTITY_API_VERSION=os.getenv('OS_IDENTITY_API_VERSION','UNDEFINED')
+OS_PASSWORD=os.getenv('OS_PASSWORD','UNDEFINED')
+OS_PROJECT_NAME=os.getenv('OS_PROJECT_NAME','UNDEFINED')
+OS_USER_DOMAIN_NAME=os.getenv('OS_USER_DOMAIN_NAME','UNDEFINED')
+OS_PROJECT_DOMAIN_ID=os.getenv('OS_PROJECT_DOMAIN_ID','UNDEFINED')
+S_REGION_NAME=os.getenv('S_REGION_NAME','UNDEFINED')
+OS_INTERFACE=os.getenv('OS_INTERFACE','UNDEFINED')
+OS_IDENTITY_API_VERSION=os.getenv('OS_IDENTITY_API_VERSION','UNDEFINED')
+EVENT_CREATE=os.getenv('EVENT_CREATE','UNDEFINED')
+EVENT_DELETE=os.getenv('EVENT_DELETE','UNDEFINED')
+EVENT_IP_UPDATE=os.getenv('EVENT_IP_UPDATE','UNDEFINED')
+INTERNAL_DOMAIN=os.getenv('INTERNAL_DOMAIN','UNDEFINED')
+EXTERNAL_DOMAIN=os.getenv('EXTERNAL_DOMAIN','UNDEFINED')
+PDNS_API=os.getenv('PDNS_API','UNDEFINED')
+PDNS_KEY=os.getenv('PDNS_KEY','UNDEFINED')
+TTL=os.getenv('TTL','UNDEFINED')
+NAMESERVER=os.getenv('NAMESERVER','UNDEFINED')
 
 
-log.basicConfig(filename=LOG_FILE, level=log.INFO, format='%(asctime)s %(message)s')
+log.basicConfig(filename=LOG_FILE, level=log.DEBUG, format='%(asctime)s %(message)s')
 
 class DnsUpdater(ConsumerMixin):
 
@@ -78,7 +77,7 @@ class DnsUpdater(ConsumerMixin):
                            project_domain_name=OS_PROJECT_DOMAIN_NAME)
         s = session.Session(auth=auth)
         log.info("Session {}".format(s))
-        self.nova = client.Client(session=s)
+        self.nova = client.Client(session=s, version=2)
         return
 
     def get_server_for_ip(self, ip, project_id):

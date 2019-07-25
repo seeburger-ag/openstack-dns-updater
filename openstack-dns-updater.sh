@@ -1,6 +1,4 @@
 #!/bin/bash
 
-source /etc/environment
-
-/usr/bin/python3 openstack-dns-updater.py
-
+[ -f /etc/environment ] && source /etc/environment
+/usr/local/bin/python3 /usr/local/bin/openstack-dns-updater.py
