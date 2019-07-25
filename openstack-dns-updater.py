@@ -63,7 +63,7 @@ TTL=os.getenv('TTL','UNDEFINED')
 NAMESERVER=os.getenv('NAMESERVER','UNDEFINED')
 
 
-log.basicConfig(filename=LOG_FILE, level=log.DEBUG, format='%(asctime)s %(message)s')
+log.basicConfig(filename=LOG_FILE, level=log.INFO, format='%(asctime)s %(message)s')
 
 class DnsUpdater(ConsumerMixin):
 
